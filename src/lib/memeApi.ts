@@ -14,13 +14,28 @@ const GIPHY_KEY = "dc6zaTOxFJmzC";
 const isImage = (url: string) =>
   /\.(jpe?g|png|gif|webp)(\?.*)?$/i.test(url) || url.includes("i.redd.it") || url.includes("i.imgur.com");
 
+const NSFW_WORDS = [
+  "nsfw", "porn", "sex", "sexy", "nude", "naked", "boob", "tit", "ass",
+  "thicc", "thirst", "horny", "onlyfans", "hentai", "xxx", "milf", "cum",
+  "dick", "pussy", "fuck", "kink", "fetish", "lewd",
+];
+
+const containsNSFW = (text: string) => {
+  const t = (text || "").toLowerCase();
+  return NSFW_WORDS.some((w) => new RegExp(`\\b${w}`, "i").test(t));
+};
+
+// SFW-only meme subreddits
+const SFW_SUBS = "memes+wholesomememes+meme+AdviceAnimals+MemeEconomy+facepalm";
+
 async function fetchReddit(query: string): Promise<Meme[]> {
-  const sub = query.trim() ? "memes" : "memes";
-  const url = query.trim()
-    ? `https://www.reddit.com/r/memes+dankmemes+wholesomememes/search.json?q=${encodeURIComponent(
-        query
-      )}&restrict_sr=1&limit=40&sort=relevance`
-    : `https://www.reddit.com/r/${sub}/hot.json?limit=40`;
+  const q = query.trim();
+  // Force SFW with include_over_18=off and restrict to SFW subs
+  const url = q
+    ? `https://www.reddit.com/r/${SFW_SUBS}/search.json?q=${encodeURIComponent(
+        q
+      )}&restrict_sr=1&limit=50&sort=relevance&include_over_18=off`
+    : `https://www.reddit.com/r/memes/hot.json?limit=50&include_over_18=off`;
 
   try {
     const res = await fetch(url);
@@ -29,7 +44,15 @@ async function fetchReddit(query: string): Promise<Meme[]> {
     const posts = json?.data?.children ?? [];
     return posts
       .map((p: any) => p.data)
-      .filter((d: any) => d?.url && isImage(d.url) && !d.over_18)
+      .filter(
+        (d: any) =>
+          d?.url &&
+          isImage(d.url) &&
+          !d.over_18 &&
+          !d.thumbnail?.toString().includes("nsfw") &&
+          !containsNSFW(d.title) &&
+          !containsNSFW(d.subreddit)
+      )
       .map((d: any) => ({
         id: `r_${d.id}`,
         title: d.title as string,
@@ -46,8 +69,8 @@ async function fetchReddit(query: string): Promise<Meme[]> {
 
 async function fetchGiphy(query: string): Promise<Meme[]> {
   const endpoint = query.trim()
-    ? `https://api.giphy.com/v1/gifs/search?api_key=${GIPHY_KEY}&q=${encodeURIComponent(query)}&limit=30&rating=pg-13`
-    : `https://api.giphy.com/v1/gifs/trending?api_key=${GIPHY_KEY}&limit=30&rating=pg-13`;
+    ? `https://api.giphy.com/v1/gifs/search?api_key=${GIPHY_KEY}&q=${encodeURIComponent(query)}&limit=30&rating=g`
+    : `https://api.giphy.com/v1/gifs/trending?api_key=${GIPHY_KEY}&limit=30&rating=g`;
   try {
     const res = await fetch(endpoint);
     if (!res.ok) return [];
