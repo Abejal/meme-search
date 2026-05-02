@@ -53,7 +53,7 @@ const Index = () => {
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search memes... (e.g. cat, monday, drake)"
+            placeholder={placeholder}
             className="h-14 rounded-full border-border bg-card pl-12 pr-4 text-base shadow-card focus-visible:ring-primary"
           />
         </div>
