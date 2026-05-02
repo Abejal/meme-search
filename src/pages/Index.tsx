@@ -5,12 +5,27 @@ import { Meme, searchMemes } from "@/lib/memeApi";
 import { MemeCard } from "@/components/MemeCard";
 import { MemeModal } from "@/components/MemeModal";
 
+const PLACEHOLDERS = [
+  "pain",
+  "me at 3am",
+  "monday morning energy",
+  "when the code finally works",
+  "carl johnson",
+  "distracted boyfriend",
+  "drake reaction",
+  "this is fine",
+  "my brain during exams",
+];
+
 const Index = () => {
   const [query, setQuery] = useState("");
   const [submitted, setSubmitted] = useState("");
   const [memes, setMemes] = useState<Meme[]>([]);
   const [loading, setLoading] = useState(true);
   const [active, setActive] = useState<Meme | null>(null);
+  const [placeholder] = useState(
+    () => PLACEHOLDERS[Math.floor(Math.random() * PLACEHOLDERS.length)]
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -53,7 +68,7 @@ const Index = () => {
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search memes... (e.g. cat, monday, drake)"
+            placeholder={placeholder}
             className="h-14 rounded-full border-border bg-card pl-12 pr-4 text-base shadow-card focus-visible:ring-primary"
           />
         </div>
