@@ -50,9 +50,9 @@ const Index = () => {
   };
 
   const onSurprise = () => {
-    const topic = randomTopic();
+    let topic = randomTopic();
+    while (topic === submitted) topic = randomTopic(); // avoid repeat → ensures new results
     setQuery(topic);
-    setSubmitted(topic + " " + Math.random().toString(36).slice(2, 5)); // ensures effect re-runs even on repeat
     setSubmitted(topic);
   };
 
