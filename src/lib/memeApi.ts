@@ -179,6 +179,37 @@ async function fetchImgflip(query: string): Promise<Meme[]> {
   }
 }
 
+// meme-api.com (D3vD) — random memes from popular subs. No query support,
+// so we pull a big batch and let the relevance ranker filter.
+const MEMEAPI_SUBS = [
+  "memes", "dankmemes", "wholesomememes", "me_irl", "AdviceAnimals",
+  "PrequelMemes", "HistoryMemes", "ProgrammerHumor", "gamingmemes",
+];
+async function fetchMemeApi(query: string): Promise<Meme[]> {
+  try {
+    // /gimme/{sub}/50 returns up to 50 random memes
+    const sub = MEMEAPI_SUBS[Math.floor(Math.random() * MEMEAPI_SUBS.length)];
+    const res = await fetch(`https://meme-api.com/gimme/${sub}/50`);
+    if (!res.ok) return [];
+    const json = await res.json();
+    const memes = json?.memes ?? [];
+    return memes
+      .filter((m: any) => m && !m.nsfw && !m.spoiler && m.url && isImage(m.url))
+      .filter((m: any) => !containsNSFW(m.title) && !containsNSFW(m.subreddit))
+      .map((m: any) => ({
+        id: `ma_${m.postLink?.split("/").pop() || m.url}`,
+        title: m.title,
+        url: m.url,
+        source: "reddit" as const,
+        permalink: m.postLink,
+        width: undefined,
+        height: undefined,
+      }));
+  } catch {
+    return [];
+  }
+}
+
 // Imgur — massive meme repository, great for popular & niche topics
 async function fetchImgur(query: string): Promise<Meme[]> {
   const q = query.trim();
@@ -217,23 +248,45 @@ async function fetchImgur(query: string): Promise<Meme[]> {
   }
 }
 
+// Score a meme by how well its title matches the query.
+function scoreMeme(m: Meme, tokens: string[], rawQuery: string): number {
+  if (!tokens.length) return 0;
+  const title = (m.title || "").toLowerCase();
+  let score = 0;
+  if (rawQuery && title.includes(rawQuery)) score += 100;
+  for (const t of tokens) {
+    if (!t) continue;
+    if (title.includes(t)) score += 10;
+    if (title.split(/\W+/).includes(t)) score += 5;
+  }
+  if (m.source === "imgflip") score += 3;
+  return score;
+}
+
 export async function searchMemes(query: string): Promise<Meme[]> {
-  const [reddit, giphy, tenor, imgflip, imgur] = await Promise.all([
+  const [reddit, giphy, tenor, imgflip, imgur, memeApi] = await Promise.all([
     fetchReddit(query),
     fetchGiphy(query),
     fetchTenor(query),
     fetchImgflip(query),
     fetchImgur(query),
+    fetchMemeApi(query),
   ]);
 
-  // Imgflip first (classic templates surface for popular searches), then interleave the rest
-  const out: Meme[] = [...imgflip];
-  const max = Math.max(reddit.length, giphy.length, tenor.length, imgur.length);
-  for (let i = 0; i < max; i++) {
-    if (reddit[i]) out.push(reddit[i]);
-    if (imgur[i]) out.push(imgur[i]);
-    if (tenor[i]) out.push(tenor[i]);
-    if (giphy[i]) out.push(giphy[i]);
-  }
-  return out;
+  const all = [...imgflip, ...reddit, ...imgur, ...tenor, ...giphy, ...memeApi];
+  const seen = new Set<string>();
+  const unique = all.filter((m) => {
+    if (!m?.url || seen.has(m.url)) return false;
+    seen.add(m.url);
+    return true;
+  });
+
+  const raw = query.trim().toLowerCase();
+  const tokens = raw.split(/\s+/).filter((t) => t.length > 1);
+  if (!tokens.length) return unique;
+
+  const scored = unique.map((m) => ({ m, s: scoreMeme(m, tokens, raw) }));
+  const strong = scored.filter((x) => x.s >= 5).sort((a, b) => b.s - a.s).map((x) => x.m);
+  const weak = scored.filter((x) => x.s < 5).map((x) => x.m);
+  return [...strong, ...weak];
 }
