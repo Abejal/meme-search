@@ -53,16 +53,15 @@ const SFW_SUBS = [
   "dankmemes", // re-included but heavily filtered below
 ].join("+");
 
-async function fetchReddit(query: string): Promise<Meme[]> {
+async function fetchReddit(query: string, allowNsfw = false): Promise<Meme[]> {
   const q = query.trim();
-  // Two parallel queries: restricted to SFW subs AND a broader site-wide search,
-  // both filtered hard for NSFW. This dramatically improves recall for niche topics.
+  const nsfwParam = allowNsfw ? "on" : "off";
   const urls = q
     ? [
-        `https://www.reddit.com/r/${SFW_SUBS}/search.json?q=${encodeURIComponent(q)}&restrict_sr=1&limit=75&sort=relevance&include_over_18=off`,
-        `https://www.reddit.com/search.json?q=${encodeURIComponent(q + " meme")}&limit=75&sort=relevance&include_over_18=off&type=link`,
+        `https://www.reddit.com/r/${SFW_SUBS}/search.json?q=${encodeURIComponent(q)}&restrict_sr=1&limit=75&sort=relevance&include_over_18=${nsfwParam}`,
+        `https://www.reddit.com/search.json?q=${encodeURIComponent(q + " meme")}&limit=75&sort=relevance&include_over_18=${nsfwParam}&type=link`,
       ]
-    : [`https://www.reddit.com/r/memes/hot.json?limit=75&include_over_18=off`];
+    : [`https://www.reddit.com/r/memes/hot.json?limit=75&include_over_18=${nsfwParam}`];
 
   try {
     const responses = await Promise.all(
@@ -75,9 +74,11 @@ async function fetchReddit(query: string): Promise<Meme[]> {
       for (const p of posts) {
         const d = p.data;
         if (!d?.url || !isImage(d.url)) continue;
-        if (d.over_18) continue;
-        if (d.thumbnail?.toString().includes("nsfw")) continue;
-        if (containsNSFW(d.title) || containsNSFW(d.subreddit)) continue;
+        if (!allowNsfw) {
+          if (d.over_18) continue;
+          if (d.thumbnail?.toString().includes("nsfw")) continue;
+          if (containsNSFW(d.title) || containsNSFW(d.subreddit)) continue;
+        }
         if (seen.has(d.id)) continue;
         seen.add(d.id);
         out.push({
