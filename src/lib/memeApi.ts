@@ -98,16 +98,17 @@ async function fetchReddit(query: string, allowNsfw = false): Promise<Meme[]> {
   }
 }
 
-async function fetchGiphy(query: string): Promise<Meme[]> {
+async function fetchGiphy(query: string, allowNsfw = false): Promise<Meme[]> {
+  const rating = allowNsfw ? "r" : "pg-13";
   const endpoint = query.trim()
-    ? `https://api.giphy.com/v1/gifs/search?api_key=${GIPHY_KEY}&q=${encodeURIComponent(query)}&limit=30&rating=pg-13`
-    : `https://api.giphy.com/v1/gifs/trending?api_key=${GIPHY_KEY}&limit=30&rating=pg-13`;
+    ? `https://api.giphy.com/v1/gifs/search?api_key=${GIPHY_KEY}&q=${encodeURIComponent(query)}&limit=30&rating=${rating}`
+    : `https://api.giphy.com/v1/gifs/trending?api_key=${GIPHY_KEY}&limit=30&rating=${rating}`;
   try {
     const res = await fetch(endpoint);
     if (!res.ok) return [];
     const json = await res.json();
     return (json?.data ?? [])
-      .filter((g: any) => !containsNSFW(g.title))
+      .filter((g: any) => allowNsfw || !containsNSFW(g.title))
       .map((g: any) => ({
         id: `g_${g.id}`,
         title: g.title || "Giphy",
@@ -123,16 +124,17 @@ async function fetchGiphy(query: string): Promise<Meme[]> {
 }
 
 // Tenor — huge GIF library, much better topical coverage than Giphy for pop culture
-async function fetchTenor(query: string): Promise<Meme[]> {
+async function fetchTenor(query: string, allowNsfw = false): Promise<Meme[]> {
   const q = query.trim();
   if (!q) return [];
-  const url = `https://g.tenor.com/v1/search?q=${encodeURIComponent(q + " meme")}&key=${TENOR_KEY}&limit=30&contentfilter=high&media_filter=minimal`;
+  const filter = allowNsfw ? "off" : "high";
+  const url = `https://g.tenor.com/v1/search?q=${encodeURIComponent(q + " meme")}&key=${TENOR_KEY}&limit=30&contentfilter=${filter}&media_filter=minimal`;
   try {
     const res = await fetch(url);
     if (!res.ok) return [];
     const json = await res.json();
     return (json?.results ?? [])
-      .filter((g: any) => !containsNSFW(g.content_description || g.title || ""))
+      .filter((g: any) => allowNsfw || !containsNSFW(g.content_description || g.title || ""))
       .map((g: any) => {
         const media = g.media?.[0]?.gif || g.media?.[0]?.tinygif;
         return {
@@ -186,17 +188,16 @@ const MEMEAPI_SUBS = [
   "memes", "dankmemes", "wholesomememes", "me_irl", "AdviceAnimals",
   "PrequelMemes", "HistoryMemes", "ProgrammerHumor", "gamingmemes",
 ];
-async function fetchMemeApi(query: string): Promise<Meme[]> {
+async function fetchMemeApi(query: string, allowNsfw = false): Promise<Meme[]> {
   try {
-    // /gimme/{sub}/50 returns up to 50 random memes
     const sub = MEMEAPI_SUBS[Math.floor(Math.random() * MEMEAPI_SUBS.length)];
     const res = await fetch(`https://meme-api.com/gimme/${sub}/50`);
     if (!res.ok) return [];
     const json = await res.json();
     const memes = json?.memes ?? [];
     return memes
-      .filter((m: any) => m && !m.nsfw && !m.spoiler && m.url && isImage(m.url))
-      .filter((m: any) => !containsNSFW(m.title) && !containsNSFW(m.subreddit))
+      .filter((m: any) => m && m.url && isImage(m.url))
+      .filter((m: any) => allowNsfw || (!m.nsfw && !m.spoiler && !containsNSFW(m.title) && !containsNSFW(m.subreddit)))
       .map((m: any) => ({
         id: `ma_${m.postLink?.split("/").pop() || m.url}`,
         title: m.title,
@@ -212,7 +213,7 @@ async function fetchMemeApi(query: string): Promise<Meme[]> {
 }
 
 // Imgur — massive meme repository, great for popular & niche topics
-async function fetchImgur(query: string): Promise<Meme[]> {
+async function fetchImgur(query: string, allowNsfw = false): Promise<Meme[]> {
   const q = query.trim();
   if (!q) return [];
   const url = `https://api.imgur.com/3/gallery/search/top/all/0?q=${encodeURIComponent(q + " meme")}`;
@@ -225,9 +226,10 @@ async function fetchImgur(query: string): Promise<Meme[]> {
     const items = json?.data ?? [];
     const out: Meme[] = [];
     for (const it of items) {
-      if (it.nsfw) continue;
-      if (containsNSFW(it.title || "") || containsNSFW(it.tags?.map((t: any) => t.name).join(" ") || "")) continue;
-      // Albums: take first image. Single images: use directly.
+      if (!allowNsfw) {
+        if (it.nsfw) continue;
+        if (containsNSFW(it.title || "") || containsNSFW(it.tags?.map((t: any) => t.name).join(" ") || "")) continue;
+      }
       const img = it.is_album ? it.images?.[0] : it;
       if (!img?.link) continue;
       if (img.type && !img.type.startsWith("image/")) continue;
@@ -264,14 +266,14 @@ function scoreMeme(m: Meme, tokens: string[], rawQuery: string): number {
   return score;
 }
 
-export async function searchMemes(query: string): Promise<Meme[]> {
+export async function searchMemes(query: string, allowNsfw = false): Promise<Meme[]> {
   const [reddit, giphy, tenor, imgflip, imgur, memeApi] = await Promise.all([
-    fetchReddit(query),
-    fetchGiphy(query),
-    fetchTenor(query),
+    fetchReddit(query, allowNsfw),
+    fetchGiphy(query, allowNsfw),
+    fetchTenor(query, allowNsfw),
     fetchImgflip(query),
-    fetchImgur(query),
-    fetchMemeApi(query),
+    fetchImgur(query, allowNsfw),
+    fetchMemeApi(query, allowNsfw),
   ]);
 
   const all = [...imgflip, ...reddit, ...imgur, ...tenor, ...giphy, ...memeApi];
@@ -291,3 +293,13 @@ export async function searchMemes(query: string): Promise<Meme[]> {
   const weak = scored.filter((x) => x.s < 5).map((x) => x.m);
   return [...strong, ...weak];
 }
+
+// Random surprise topics — picks one and runs a search
+const SURPRISE_TOPICS = [
+  "distracted boyfriend", "drake", "this is fine", "stonks", "spongebob",
+  "shrek", "cat", "doge", "pepe", "leonardo dicaprio", "monday",
+  "expanding brain", "surprised pikachu", "wojak", "bonk", "patrick star",
+  "always has been", "two buttons", "change my mind", "side eye",
+];
+export const randomTopic = () =>
+  SURPRISE_TOPICS[Math.floor(Math.random() * SURPRISE_TOPICS.length)];
