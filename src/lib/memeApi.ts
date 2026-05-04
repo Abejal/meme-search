@@ -2,7 +2,7 @@ export type Meme = {
   id: string;
   title: string;
   url: string; // image or gif url
-  source: "reddit" | "giphy" | "imgflip" | "tenor";
+  source: "reddit" | "giphy" | "imgflip" | "tenor" | "imgur";
   permalink?: string;
   width?: number;
   height?: number;
