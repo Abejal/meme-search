@@ -2,7 +2,7 @@ export type Meme = {
   id: string;
   title: string;
   url: string; // image or gif url
-  source: "reddit" | "giphy" | "imgflip" | "tenor";
+  source: "reddit" | "giphy" | "imgflip" | "tenor" | "imgur";
   permalink?: string;
   width?: number;
   height?: number;
@@ -12,6 +12,8 @@ export type Meme = {
 const GIPHY_KEY = "dc6zaTOxFJmzC";
 // Public Tenor demo key from Google's docs — fine for low volume. Swap for your own in prod.
 const TENOR_KEY = "LIVDSRZULELA";
+// Imgur Client ID — safe to expose in frontend (designed for public API access)
+const IMGUR_CLIENT_ID = "7accbaf7665acd3f8d4be2be76b3bfc5";
 
 const isImage = (url: string) =>
   /\.(jpe?g|png|gif|webp)(\?.*)?$/i.test(url) ||
@@ -177,19 +179,59 @@ async function fetchImgflip(query: string): Promise<Meme[]> {
   }
 }
 
+// Imgur — massive meme repository, great for popular & niche topics
+async function fetchImgur(query: string): Promise<Meme[]> {
+  const q = query.trim();
+  if (!q) return [];
+  const url = `https://api.imgur.com/3/gallery/search/top/all/0?q=${encodeURIComponent(q + " meme")}`;
+  try {
+    const res = await fetch(url, {
+      headers: { Authorization: `Client-ID ${IMGUR_CLIENT_ID}` },
+    });
+    if (!res.ok) return [];
+    const json = await res.json();
+    const items = json?.data ?? [];
+    const out: Meme[] = [];
+    for (const it of items) {
+      if (it.nsfw) continue;
+      if (containsNSFW(it.title || "") || containsNSFW(it.tags?.map((t: any) => t.name).join(" ") || "")) continue;
+      // Albums: take first image. Single images: use directly.
+      const img = it.is_album ? it.images?.[0] : it;
+      if (!img?.link) continue;
+      if (img.type && !img.type.startsWith("image/")) continue;
+      if (!isImage(img.link)) continue;
+      out.push({
+        id: `im_${it.id}`,
+        title: it.title || "Imgur",
+        url: img.link,
+        source: "imgur" as const,
+        permalink: it.link || `https://imgur.com/gallery/${it.id}`,
+        width: img.width,
+        height: img.height,
+      });
+      if (out.length >= 30) break;
+    }
+    return out;
+  } catch {
+    return [];
+  }
+}
+
 export async function searchMemes(query: string): Promise<Meme[]> {
-  const [reddit, giphy, tenor, imgflip] = await Promise.all([
+  const [reddit, giphy, tenor, imgflip, imgur] = await Promise.all([
     fetchReddit(query),
     fetchGiphy(query),
     fetchTenor(query),
     fetchImgflip(query),
+    fetchImgur(query),
   ]);
 
   // Imgflip first (classic templates surface for popular searches), then interleave the rest
   const out: Meme[] = [...imgflip];
-  const max = Math.max(reddit.length, giphy.length, tenor.length);
+  const max = Math.max(reddit.length, giphy.length, tenor.length, imgur.length);
   for (let i = 0; i < max; i++) {
     if (reddit[i]) out.push(reddit[i]);
+    if (imgur[i]) out.push(imgur[i]);
     if (tenor[i]) out.push(tenor[i]);
     if (giphy[i]) out.push(giphy[i]);
   }
