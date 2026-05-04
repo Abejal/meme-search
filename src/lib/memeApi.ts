@@ -98,16 +98,17 @@ async function fetchReddit(query: string, allowNsfw = false): Promise<Meme[]> {
   }
 }
 
-async function fetchGiphy(query: string): Promise<Meme[]> {
+async function fetchGiphy(query: string, allowNsfw = false): Promise<Meme[]> {
+  const rating = allowNsfw ? "r" : "pg-13";
   const endpoint = query.trim()
-    ? `https://api.giphy.com/v1/gifs/search?api_key=${GIPHY_KEY}&q=${encodeURIComponent(query)}&limit=30&rating=pg-13`
-    : `https://api.giphy.com/v1/gifs/trending?api_key=${GIPHY_KEY}&limit=30&rating=pg-13`;
+    ? `https://api.giphy.com/v1/gifs/search?api_key=${GIPHY_KEY}&q=${encodeURIComponent(query)}&limit=30&rating=${rating}`
+    : `https://api.giphy.com/v1/gifs/trending?api_key=${GIPHY_KEY}&limit=30&rating=${rating}`;
   try {
     const res = await fetch(endpoint);
     if (!res.ok) return [];
     const json = await res.json();
     return (json?.data ?? [])
-      .filter((g: any) => !containsNSFW(g.title))
+      .filter((g: any) => allowNsfw || !containsNSFW(g.title))
       .map((g: any) => ({
         id: `g_${g.id}`,
         title: g.title || "Giphy",
