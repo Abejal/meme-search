@@ -188,17 +188,16 @@ const MEMEAPI_SUBS = [
   "memes", "dankmemes", "wholesomememes", "me_irl", "AdviceAnimals",
   "PrequelMemes", "HistoryMemes", "ProgrammerHumor", "gamingmemes",
 ];
-async function fetchMemeApi(query: string): Promise<Meme[]> {
+async function fetchMemeApi(query: string, allowNsfw = false): Promise<Meme[]> {
   try {
-    // /gimme/{sub}/50 returns up to 50 random memes
     const sub = MEMEAPI_SUBS[Math.floor(Math.random() * MEMEAPI_SUBS.length)];
     const res = await fetch(`https://meme-api.com/gimme/${sub}/50`);
     if (!res.ok) return [];
     const json = await res.json();
     const memes = json?.memes ?? [];
     return memes
-      .filter((m: any) => m && !m.nsfw && !m.spoiler && m.url && isImage(m.url))
-      .filter((m: any) => !containsNSFW(m.title) && !containsNSFW(m.subreddit))
+      .filter((m: any) => m && m.url && isImage(m.url))
+      .filter((m: any) => allowNsfw || (!m.nsfw && !m.spoiler && !containsNSFW(m.title) && !containsNSFW(m.subreddit)))
       .map((m: any) => ({
         id: `ma_${m.postLink?.split("/").pop() || m.url}`,
         title: m.title,
