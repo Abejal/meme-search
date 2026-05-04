@@ -213,7 +213,7 @@ async function fetchMemeApi(query: string, allowNsfw = false): Promise<Meme[]> {
 }
 
 // Imgur — massive meme repository, great for popular & niche topics
-async function fetchImgur(query: string): Promise<Meme[]> {
+async function fetchImgur(query: string, allowNsfw = false): Promise<Meme[]> {
   const q = query.trim();
   if (!q) return [];
   const url = `https://api.imgur.com/3/gallery/search/top/all/0?q=${encodeURIComponent(q + " meme")}`;
@@ -226,9 +226,10 @@ async function fetchImgur(query: string): Promise<Meme[]> {
     const items = json?.data ?? [];
     const out: Meme[] = [];
     for (const it of items) {
-      if (it.nsfw) continue;
-      if (containsNSFW(it.title || "") || containsNSFW(it.tags?.map((t: any) => t.name).join(" ") || "")) continue;
-      // Albums: take first image. Single images: use directly.
+      if (!allowNsfw) {
+        if (it.nsfw) continue;
+        if (containsNSFW(it.title || "") || containsNSFW(it.tags?.map((t: any) => t.name).join(" ") || "")) continue;
+      }
       const img = it.is_album ? it.images?.[0] : it;
       if (!img?.link) continue;
       if (img.type && !img.type.startsWith("image/")) continue;
