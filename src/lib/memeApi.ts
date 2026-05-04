@@ -12,6 +12,8 @@ export type Meme = {
 const GIPHY_KEY = "dc6zaTOxFJmzC";
 // Public Tenor demo key from Google's docs — fine for low volume. Swap for your own in prod.
 const TENOR_KEY = "LIVDSRZULELA";
+// Imgur Client ID — safe to expose in frontend (designed for public API access)
+const IMGUR_CLIENT_ID = "7accbaf7665acd3f8d4be2be76b3bfc5";
 
 const isImage = (url: string) =>
   /\.(jpe?g|png|gif|webp)(\?.*)?$/i.test(url) ||
