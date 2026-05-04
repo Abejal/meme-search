@@ -179,6 +179,37 @@ async function fetchImgflip(query: string): Promise<Meme[]> {
   }
 }
 
+// meme-api.com (D3vD) — random memes from popular subs. No query support,
+// so we pull a big batch and let the relevance ranker filter.
+const MEMEAPI_SUBS = [
+  "memes", "dankmemes", "wholesomememes", "me_irl", "AdviceAnimals",
+  "PrequelMemes", "HistoryMemes", "ProgrammerHumor", "gamingmemes",
+];
+async function fetchMemeApi(query: string): Promise<Meme[]> {
+  try {
+    // /gimme/{sub}/50 returns up to 50 random memes
+    const sub = MEMEAPI_SUBS[Math.floor(Math.random() * MEMEAPI_SUBS.length)];
+    const res = await fetch(`https://meme-api.com/gimme/${sub}/50`);
+    if (!res.ok) return [];
+    const json = await res.json();
+    const memes = json?.memes ?? [];
+    return memes
+      .filter((m: any) => m && !m.nsfw && !m.spoiler && m.url && isImage(m.url))
+      .filter((m: any) => !containsNSFW(m.title) && !containsNSFW(m.subreddit))
+      .map((m: any) => ({
+        id: `ma_${m.postLink?.split("/").pop() || m.url}`,
+        title: m.title,
+        url: m.url,
+        source: "reddit" as const,
+        permalink: m.postLink,
+        width: undefined,
+        height: undefined,
+      }));
+  } catch {
+    return [];
+  }
+}
+
 // Imgur — massive meme repository, great for popular & niche topics
 async function fetchImgur(query: string): Promise<Meme[]> {
   const q = query.trim();
