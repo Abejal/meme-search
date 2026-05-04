@@ -124,16 +124,17 @@ async function fetchGiphy(query: string, allowNsfw = false): Promise<Meme[]> {
 }
 
 // Tenor — huge GIF library, much better topical coverage than Giphy for pop culture
-async function fetchTenor(query: string): Promise<Meme[]> {
+async function fetchTenor(query: string, allowNsfw = false): Promise<Meme[]> {
   const q = query.trim();
   if (!q) return [];
-  const url = `https://g.tenor.com/v1/search?q=${encodeURIComponent(q + " meme")}&key=${TENOR_KEY}&limit=30&contentfilter=high&media_filter=minimal`;
+  const filter = allowNsfw ? "off" : "high";
+  const url = `https://g.tenor.com/v1/search?q=${encodeURIComponent(q + " meme")}&key=${TENOR_KEY}&limit=30&contentfilter=${filter}&media_filter=minimal`;
   try {
     const res = await fetch(url);
     if (!res.ok) return [];
     const json = await res.json();
     return (json?.results ?? [])
-      .filter((g: any) => !containsNSFW(g.content_description || g.title || ""))
+      .filter((g: any) => allowNsfw || !containsNSFW(g.content_description || g.title || ""))
       .map((g: any) => {
         const media = g.media?.[0]?.gif || g.media?.[0]?.tinygif;
         return {
