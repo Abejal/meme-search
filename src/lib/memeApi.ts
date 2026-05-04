@@ -266,14 +266,14 @@ function scoreMeme(m: Meme, tokens: string[], rawQuery: string): number {
   return score;
 }
 
-export async function searchMemes(query: string): Promise<Meme[]> {
+export async function searchMemes(query: string, allowNsfw = false): Promise<Meme[]> {
   const [reddit, giphy, tenor, imgflip, imgur, memeApi] = await Promise.all([
-    fetchReddit(query),
-    fetchGiphy(query),
-    fetchTenor(query),
+    fetchReddit(query, allowNsfw),
+    fetchGiphy(query, allowNsfw),
+    fetchTenor(query, allowNsfw),
     fetchImgflip(query),
-    fetchImgur(query),
-    fetchMemeApi(query),
+    fetchImgur(query, allowNsfw),
+    fetchMemeApi(query, allowNsfw),
   ]);
 
   const all = [...imgflip, ...reddit, ...imgur, ...tenor, ...giphy, ...memeApi];
@@ -293,3 +293,13 @@ export async function searchMemes(query: string): Promise<Meme[]> {
   const weak = scored.filter((x) => x.s < 5).map((x) => x.m);
   return [...strong, ...weak];
 }
+
+// Random surprise topics — picks one and runs a search
+const SURPRISE_TOPICS = [
+  "distracted boyfriend", "drake", "this is fine", "stonks", "spongebob",
+  "shrek", "cat", "doge", "pepe", "leonardo dicaprio", "monday",
+  "expanding brain", "surprised pikachu", "wojak", "bonk", "patrick star",
+  "always has been", "two buttons", "change my mind", "side eye",
+];
+export const randomTopic = () =>
+  SURPRISE_TOPICS[Math.floor(Math.random() * SURPRISE_TOPICS.length)];
