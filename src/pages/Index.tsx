@@ -130,13 +130,20 @@ const Index = () => {
           <p>No memes found. Try a different search.</p>
         </div>
       ) : (
-        <div className="columns-2 gap-3 sm:columns-3 sm:gap-4 lg:columns-4">
-          {memes.map((m) => (
-            <div key={m.id} className="mb-3 break-inside-avoid sm:mb-4">
-              <MemeCard meme={m} onClick={() => setActive(m)} />
+        <>
+          <div className="columns-2 gap-3 sm:columns-3 sm:gap-4 lg:columns-4">
+            {memes.slice(0, visibleCount).map((m) => (
+              <div key={m.id} className="mb-3 break-inside-avoid sm:mb-4">
+                <MemeCard meme={m} onClick={() => setActive(m)} />
+              </div>
+            ))}
+          </div>
+          {visibleCount < memes.length && (
+            <div ref={sentinelRef} className="flex justify-center py-10 text-muted-foreground">
+              <Loader2 className="h-6 w-6 animate-spin text-primary" />
             </div>
-          ))}
-        </div>
+          )}
+        </>
       )}
 
       <MemeModal meme={active} onClose={() => setActive(null)} />
