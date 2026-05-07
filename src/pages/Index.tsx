@@ -26,6 +26,9 @@ const Index = () => {
   const [loading, setLoading] = useState(true);
   const [active, setActive] = useState<Meme | null>(null);
   const [nsfw, setNsfw] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(24);
+  const PAGE_SIZE = 24;
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
   const [placeholder] = useState(
     () => PLACEHOLDERS[Math.floor(Math.random() * PLACEHOLDERS.length)]
   );
@@ -33,6 +36,7 @@ const Index = () => {
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
+    setVisibleCount(PAGE_SIZE);
     searchMemes(submitted, nsfw).then((res) => {
       if (!cancelled) {
         setMemes(res);
@@ -43,6 +47,21 @@ const Index = () => {
       cancelled = true;
     };
   }, [submitted, nsfw]);
+
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          setVisibleCount((c) => Math.min(c + PAGE_SIZE, memes.length));
+        }
+      },
+      { rootMargin: "600px" }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [memes.length, loading]);
 
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
